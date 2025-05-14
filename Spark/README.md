@@ -388,25 +388,59 @@ result = result.union(df)
   - When you use cache() or persist(), the DataFrame is not fully cached until you invoke an action that goes through every record (e.g., count()). If you use an action like take(1)w, only one partition will be cached because Catalyst realizes that you do not need to compute all the partitions just to retrieve one record.
   - Don’t forget to cleanup with df.unpersist to evict the dataframe from cache when you no longer need it.
 - In Apache Spark, the default memory configuration divides the JVM heap space, with 60% (0.6) allocated for unified memory (execution and storage) and 40% (0.4) reserved for user data structures and internal metadata. There are nitty gritties to it. 
+- Here's a typical Spark code example that demonstrates several common operations. I'll explain how it gets broken down into jobs, stages, and tasks:
+
+```
+// Scala Spark example
+val spark = SparkSession.builder()
+  .appName("SparkJobExample")
+  .master("local[*]")
+  .getOrCreate()
+// Read data from a CSV file
+val inputDF = spark.read.option("header", "true").csv("input.csv")
+// Transformation 1: Filter records
+val filteredDF = inputDF.filter($"age" > 25)
+// Transformation 2: Select specific columns
+val selectedDF = filteredDF.select("name", "age", "salary")
+// Transformation 3: Add a new column
+val enrichedDF = selectedDF.withColumn("salary_category", 
+  when($"salary" > 50000, "high").otherwise("low"))
+// Action 1: Count total records (triggers Job 1)
+val recordCount = enrichedDF.count()
+println(s"Total records: $recordCount")
+// Transformation 4: Group by and aggregate
+val aggregatedDF = enrichedDF.groupBy("salary_category")
+  .agg(
+    avg("salary").as("avg_salary"),
+    count("*").as("count")
+  )
+// Action 2: Show results (triggers Job 2)
+aggregatedDF.show()
+// Action 3: Write results to file (triggers Job 3)
+aggregatedDF.write.mode("overwrite").parquet("output")
+spark.stop()
+```
+
+  - Execution Breakdown
+    - Jobs: This code will create 3 jobs because it has 3 actions: In Spark, a job is created whenever an action is called.
+      - enrichedDF.count() - First job
+      - aggregatedDF.show() - Second job
+      - aggregatedDF.write.mode("overwrite").parquet("output") - Third job
+    - Stages: The number of stages depends on the shuffle boundaries (like groupBy()/groupByKey()/reduceByKey()/join()/repartition()/coalesce()).
+      - Job 1 (count): 1 stage (no shuffling needed for count operation on the transformed data)
+      - Job 2 (show): 2 stages: Stage 1: All operations up to groupBy, Stage 2: The groupBy aggregation (requires a shuffle)
+      - Job 3 (write to parquet): 2 stages: Stage 1: All operations up to groupBy, Stage 2: The groupBy aggregation and write operation
+      - Total: 5 stages
+    - Tasks: The number of tasks in each stage depends on: The number of partitions in your data, The parallelism in your cluster. Assuming the default behavior with, for example, 4 partitions:
+      - Job 1, Stage 1: 4 tasks
+      - Job 2, Stage 1: 4 tasks, Stage 2: 4 tasks (or possibly fewer, depending on the number of distinct salary categories)
+      - Job 3, Stage 1: 4 tasks, Stage 2: 4 tasks (or possibly fewer)
+      - Total: Approximately 16-20 tasks
+
+- 
 - 
 
 ----------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
