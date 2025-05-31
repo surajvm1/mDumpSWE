@@ -27,6 +27,13 @@ In Redshift, max limit to a varchar/jsonvarchar datatype is 65535 bytes. In Post
 Note that, 
 - **'Tag'** is a reserved word in Redshift, if you like to use reserved words as column names or aliases you need to use delimited identifiers (double quotes). Hence to create column in a table with name tag, instead of using this: alter table schema.tablename add column tag varchar(100), you have to use this: alter table schema.tablename add column "tag" varchar(100)
 - A table's **distkey** is the column on which it's distributed to each node. Rows with the same value in this column are guaranteed to be on the same node. 
+  - DISTKEY in Redshift determines how rows are distributed across compute slices (partitions).
+  - The general rule is to set the DISTKEY to the column most commonly JOINed.
+  - With high-cardinality keys (e.g., user_id, order_id), the data gets more evenly distributed across slices/nodes, which helps avoid skew and improves parallelism.
+  - Low cardinality key causes data skew. 
+  - DISTKEY in Amazon Redshift and partitioning in Apache Spark serve different purposes and behave quite differently, even though they both relate to data distribution.
+    - Redshift focuses on storage layout and long-term performance for joins/queries.
+    - Spark focuses on in-memory distributed processing and task execution optimization.
 - A table's **sortkey** is the column by which it's sorted within each node.
 
 Note: To disable using cache results in Redshift query use: SET enable_result_cache_for_session TO OFF;
