@@ -48,6 +48,7 @@ Table of contents (rough overview):
     - [Ci-Cd-Deployments](https://github.com/Surajv311/mDumpSWE/tree/main/Ci-Cd-Deployments)
     - [Flink](https://github.com/Surajv311/mDumpSWE/tree/main/Flink)
     - [FastApi-Celery](https://github.com/Surajv311/mDumpSWE/tree/main/FastApi-Celery)
+    - [JavaSpringBoot](https://github.com/Surajv311/mDumpSWE/tree/main/JavaSpringBoot)
 
  
 ------------------------

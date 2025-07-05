@@ -40,6 +40,18 @@ List of some random notes, links, videos which can be directly visited and read 
   - https://www.linkedin.com/pulse/builder-design-pattern-prateek-mishra
   - https://www.reddit.com/r/docker/comments/1f1wqnb/how_i_reduced_docker_image_size_from_588_mb_to/
   - https://anyesh.medium.com/be-careful-while-using-lru-cache-on-the-method-a3dc2053748b
+  - https://docs.eucalyptus.cloud/eucalyptus/4.4.6/user-guide/monitoring_concepts.html
+    - A statistic is computed aggregation of metric data over a specified period of time. CloudWatch provides statistics based on the metric data points you or Eucalyptus provide. Aggregations are made using the namespace, metric name, dimensions, and the data point unit of measure, within the time period you specify. The following table describes the available statistics.
+  
+| **Statistic**   | **Description**                                                                                                                                   |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Minimum**      | The lowest value observed during the specified period. You can use this value to determine low volumes of activity for your application.         |
+| **Maximum**      | The highest value observed during the specified period. You can use this value to determine high volumes of activity for your application.       |
+| **Sum**          | All values submitted for the matching metric added together. You can use this statistic for determining the total volume of a metric.            |
+| **Average**      | The value of `Sum / SampleCount` during the specified period. By comparing this statistic with the Minimum and Maximum, you can determine the full scope of a metric and how close the average use is to the Minimum and Maximum. This comparison helps you to know when to increase or decrease your resources as needed. |
+| **SampleCount**  | The count (number) of data points used for the statistical calculation.                                                                          |
+
+  - Difference between DynamoDb PutItem vs UpdateItem: PutItem will Replace an entire item while UpdateItem will Update it.
   - Youtube/Linkedin/Twitter articles: Alex Xu, Arpit Bhayani, Hussaein Nasser - to watch/update
   - Code coverage is calculated by dividing the number of lines of code executed by a test suite by the total number of lines of code in an application, and then multiplying by 100: https://stackoverflow.com/questions/195008/what-is-code-coverage-and-how-do-you-measure-it
   - About Pool Sizing: https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing
@@ -47,7 +59,7 @@ List of some random notes, links, videos which can be directly visited and read 
 - Short notes from any book/research paper I'm reading: (To be updated in repo)
   - Dynamodb...
   - 
-
+ 
 
 ----------------------------------------------------------------------
 

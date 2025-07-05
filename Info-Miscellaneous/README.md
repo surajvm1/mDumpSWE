@@ -203,9 +203,17 @@ print(total)
   - Java uses block-based scoping; JavaScript uses function-based scoping.
   - Java has an implicit this scope for non-static methods, and implicit class scope; JavaScript has implicit global scope.
 - Scripting langs vs Programming langs: Scripting languages are generally interpreted. Programming languages are typically compiled. This means that scripting languages are executed directly by the interpreter, while programming languages are first translated into machine code by the compiler before being executed. Programming languages create exe file, scripting languages don't.
+- [Vacuum vs Vacuum Full in PostgreSQL _al](https://www.linkedin.com/pulse/vacuum-vs-full-postgresql-neelesh-ranjan-srivastava-cexbc):
+  - VACUUM (Regular):
+    - Marks dead/deleted rows as reusable space | Does NOT reduce physical file size | Runs concurrently with other operations | Updates visibility maps and prevents transaction ID wraparound
+    - Non-blocking, allows reads/writes in DB | Minimal Performance Impact | Lightweight Resource Usage | Storage space marked for reuse, file size unchanged
+    - Best for Regular maintenance | Scheduled automation | Production environments with high availability needs
+  - VACUUM FULL: 
+    - Physically rewrites table files without dead tuples | Reduces actual file size on disk | Rebuilds all indexes | Requires exclusive table locks
+    - Blocks all operations on db (exclusive lock) | High performance impact during operation | High I/O CPU Resource Usage | Reduces physical disk storage
+    - Use only after major bulk deletions | Disk space reclamation | Maintenance windows only as there is downtime, use sparingly
 - 
-
-
+- 
 
 ----------------------------------------------------------------------
 

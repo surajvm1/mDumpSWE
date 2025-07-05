@@ -19,6 +19,16 @@ Concept of application, job, stage and task in Spark:
   - A task in Spark is the smallest unit of work that can be scheduled. Each stage is divided into tasks. A task is a unit of execution that runs on a single machine. When a stage comprises transformations on an RDD, those transformations are packaged into a task to be executed on a single executor.
   - For example, if you have a Spark job that is divided into two stages and you’re running it on a cluster with two executors, each stage could be divided into two tasks. Each executor would then run a task in parallel, performing the transformations defined in that task on its subset of the data.
   - In summary, a Spark job is split into multiple stages at the points where data shuffling is needed, and each stage is split into tasks that run the same code on different data partitions.
+  - [Sidenote _al](https://www.linkedin.com/pulse/just-enough-spark-core-concepts-revisited-deepak-rajak): Spark parallelizes at two levels. One is the splitting the work among executors. The other is the slot. Each executor has a number of slots. Each slot can be assigned a Task.
+    - The JVM is naturally multithreaded, but a single JVM, such as our Driver, has a finite upper limit.
+    - By creating Tasks, the Driver can assign units of work to Slots on each Executor for parallel execution.
+    - Additionally, the Driver must also decide how to partition the data so that it can be distributed for parallel processing.
+    - Consequently, the Driver is assigning a Partition of data to each task - in this way each Task knows which piece of data it is to process.
+    - Once started, each Task will fetch from the original data source (e.g. An Azure Storage Account) the Partition of data assigned to it.
+    - You can set the number of task slots to a value two or three times (i.e. to a multiple of) the number of CPU cores. Although these task slots are often referred to as CPU cores in Spark, they’re implemented as threads that work on a physical core's thread and don’t need to correspond to the number of physical CPU cores on the machine (since different CPU manufacturer's can architect multi-threaded chips differently).
+    - In other words: All processors of today have multiple cores (e.g. 1 CPU = 8 Cores). Most processors of today are multi-threaded (e.g. 1 Core = 2 Threads, 8 cores = 16 Threads). A Spark Task runs on a Slot. 1 Thread is capable of doing 1 Task at a time. To make use of all our threads on the CPU, we cleverly assign the number of Slots to correspond to a multiple of the number of Cores (which translates to multiple Threads). By doing this, after the Driver breaks down a given command into Tasks and Partitions, which are tailor-made to fit our particular Cluster Configuration (say 4 nodes - 1 driver and 3 executors, 8 cores per node, 2 threads per core). By using our Clusters at maximum efficiency like this (utilizing all available threads), we can get our massive command executed as fast as possible (given our Cluster in this case, 3*8*2 Threads --> 48 Tasks, 48 Partitions - i.e. 1 Partition per Task)
+If we don't do then even with a 100 executor cluster, the entire burden would go to 1 executor, and the other 99 will be sitting idle - i.e. slow execution. if we foolishly assign 49 Tasks and 49 Partitions, the first pass would execute 48 Tasks in parallel across the executors cores (say in 10 minutes), then that 1 remaining Task in the next pass will execute on 1 core for another 10 minutes, while the rest of our 47 cores are sitting idle - meaning the whole job will take double the time at 20 minutes. This is obviously an inefficient use of our available resources, and could rather be fixed by setting the number of tasks/partitions to a multiple of the number of cores we have (in this setup - 48, 96 etc).
+
 - Example: [Number of spark jobs and stages _al](https://stackoverflow.com/questions/75930351/number-of-spark-jobs-and-stages)
   ```
   Example 1: 
@@ -387,25 +397,60 @@ result = result.union(df)
     - Don’t use when data is too big to fit in memory, or only need infrequent transformation
   - When you use cache() or persist(), the DataFrame is not fully cached until you invoke an action that goes through every record (e.g., count()). If you use an action like take(1)w, only one partition will be cached because Catalyst realizes that you do not need to compute all the partitions just to retrieve one record.
   - Don’t forget to cleanup with df.unpersist to evict the dataframe from cache when you no longer need it.
+- In Apache Spark, the default memory configuration divides the JVM heap space, with 60% (0.6) allocated for unified memory (execution and storage) and 40% (0.4) reserved for user data structures and internal metadata. There are nitty gritties to it. 
+- Here's a typical Spark code example that demonstrates several common operations. I'll explain how it gets broken down into jobs, stages, and tasks:
+
+```
+// Scala Spark example
+val spark = SparkSession.builder()
+  .appName("SparkJobExample")
+  .master("local[*]")
+  .getOrCreate()
+// Read data from a CSV file
+val inputDF = spark.read.option("header", "true").csv("input.csv")
+// Transformation 1: Filter records
+val filteredDF = inputDF.filter($"age" > 25)
+// Transformation 2: Select specific columns
+val selectedDF = filteredDF.select("name", "age", "salary")
+// Transformation 3: Add a new column
+val enrichedDF = selectedDF.withColumn("salary_category", 
+  when($"salary" > 50000, "high").otherwise("low"))
+// Action 1: Count total records (triggers Job 1)
+val recordCount = enrichedDF.count()
+println(s"Total records: $recordCount")
+// Transformation 4: Group by and aggregate
+val aggregatedDF = enrichedDF.groupBy("salary_category")
+  .agg(
+    avg("salary").as("avg_salary"),
+    count("*").as("count")
+  )
+// Action 2: Show results (triggers Job 2)
+aggregatedDF.show()
+// Action 3: Write results to file (triggers Job 3)
+aggregatedDF.write.mode("overwrite").parquet("output")
+spark.stop()
+```
+
+  - Execution Breakdown
+    - Jobs: This code will create 3 jobs because it has 3 actions: In Spark, a job is created whenever an action is called.
+      - enrichedDF.count() - First job
+      - aggregatedDF.show() - Second job
+      - aggregatedDF.write.mode("overwrite").parquet("output") - Third job
+    - Stages: The number of stages depends on the shuffle boundaries (like groupBy()/groupByKey()/reduceByKey()/join()/repartition()/coalesce()).
+      - Job 1 (count): 1 stage (no shuffling needed for count operation on the transformed data)
+      - Job 2 (show): 2 stages: Stage 1: All operations up to groupBy, Stage 2: The groupBy aggregation (requires a shuffle)
+      - Job 3 (write to parquet): 2 stages: Stage 1: All operations up to groupBy, Stage 2: The groupBy aggregation and write operation
+      - Total: 5 stages
+    - Tasks: The number of tasks in each stage depends on: The number of partitions in your data, The parallelism in your cluster. Assuming the default behavior with, for example, 4 partitions:
+      - Job 1, Stage 1: 4 tasks
+      - Job 2, Stage 1: 4 tasks, Stage 2: 4 tasks (or possibly fewer, depending on the number of distinct salary categories)
+      - Job 3, Stage 1: 4 tasks, Stage 2: 4 tasks (or possibly fewer)
+      - Total: Approximately 16-20 tasks
+
+- 
 - 
 
 ----------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
